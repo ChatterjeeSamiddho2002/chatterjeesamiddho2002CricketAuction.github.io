@@ -1,55 +1,589 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Multi-Sport Auction</title>
-  <link rel="stylesheet" href="style.css" />
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Multi-Sport Player Auction System</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/tailwindcss/2.2.19/tailwind.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/tailwindcss/2.2.19/tailwind.min.css" rel="stylesheet">
+    <style>
+        .auction-card {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            transform: perspective(1000px) rotateX(0deg);
+            transition: all 0.3s ease;
+        }
+        .auction-card:hover {
+            transform: perspective(1000px) rotateX(5deg) scale(1.02);
+        }
+        .bid-pulse {
+            animation: pulse 0.5s ease-in-out;
+        }
+        @keyframes pulse {
+            0% { transform: scale(1); }
+            50% { transform: scale(1.1); }
+            100% { transform: scale(1); }
+        }
+        .team-slot {
+            background: linear-gradient(45deg, #f093fb 0%, #f5576c 100%);
+        }
+        .player-card {
+            background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%);
+        }
+    </style>
 </head>
-<body>
-  <div class="container">
-    <h1>Online Sports Auction</h1>
+<body class="bg-gray-900 text-white min-h-screen">
+    <!-- Header -->
+    <header class="bg-gradient-to-r from-purple-800 to-indigo-800 shadow-lg">
+        <div class="container mx-auto px-4 py-6">
+            <h1 class="text-4xl font-bold text-center">🏆 Multi-Sport Player Auction System</h1>
+        </div>
+    </header>
 
-    <div class="setup">
-      <label for="sport">Choose Sport:</label>
-      <select id="sport">
-        <option value="cricket">Cricket</option>
-        <option value="football">Football</option>
-        <option value="basketball">Basketball</option>
-      </select>
-      <button onclick="loadSport()">Start Auction</button>
+    <!-- Setup Section -->
+    <div id="setupSection" class="container mx-auto px-4 py-8">
+        <div class="max-w-4xl mx-auto">
+            <div class="bg-gray-800 rounded-lg p-6 mb-6">
+                <h2 class="text-2xl font-bold mb-4">Setup Auction</h2>
+                
+                <!-- Sport Selection -->
+                <div class="mb-6">
+                    <label class="block text-sm font-medium mb-2">Select Sport</label>
+                    <select id="sportSelect" onchange="updateSportSettings()" 
+                            class="w-full p-3 bg-gray-700 border border-gray-600 rounded-lg">
+                        <option value="cricket">🏏 Cricket</option>
+                        <option value="football">⚽ Football</option>
+                        <option value="basketball">🏀 Basketball</option>
+                        <option value="kabaddi">🤼 Kabaddi</option>
+                        <option value="hockey">🏑 Hockey</option>
+                        <option value="volleyball">🏐 Volleyball</option>
+                        <option value="badminton">🏸 Badminton</option>
+                        <option value="tennis">🎾 Tennis</option>
+                    </select>
+                </div>
+                
+                <!-- File Upload -->
+                <div class="mb-6">
+                    <label class="block text-sm font-medium mb-2">Upload Player Dataset (Excel)</label>
+                    <input type="file" id="fileInput" accept=".xlsx,.xls" 
+                           class="w-full p-3 bg-gray-700 border border-gray-600 rounded-lg">
+                </div>
+
+                <!-- Teams Setup -->
+                <div class="grid md:grid-cols-2 gap-6 mb-6">
+                    <div>
+                        <label class="block text-sm font-medium mb-2">Number of Teams</label>
+                        <input type="number" id="numTeams" value="8" min="2" max="12"
+                               class="w-full p-3 bg-gray-700 border border-gray-600 rounded-lg">
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium mb-2">Budget per Team (Crores)</label>
+                        <input type="number" id="teamBudget" value="100" min="50" max="200"
+                               class="w-full p-3 bg-gray-700 border border-gray-600 rounded-lg">
+                    </div>
+                </div>
+
+                <!-- Team Names -->
+                <div class="mb-6">
+                    <label class="block text-sm font-medium mb-2">Team Names (comma-separated)</label>
+                    <textarea id="teamNames" rows="3"
+                              class="w-full p-3 bg-gray-700 border border-gray-600 rounded-lg"
+                              placeholder="Team names will auto-populate based on sport...">Mumbai Indians, Chennai Super Kings, Royal Challengers Bangalore, Delhi Capitals, Kolkata Knight Riders, Punjab Kings, Rajasthan Royals, Sunrisers Hyderabad</textarea>
+                </div>
+
+                <button onclick="startAuction()" 
+                        class="w-full bg-gradient-to-r from-green-500 to-blue-500 hover:from-green-600 hover:to-blue-600 
+                               text-white font-bold py-3 px-6 rounded-lg transition duration-300">
+                    Start Auction
+                </button>
+            </div>
+        </div>
     </div>
 
-    <div id="auctionSection" style="display:none;">
-      <h2 id="currentSportTitle"></h2>
+    <!-- Auction Section -->
+    <div id="auctionSection" class="container mx-auto px-4 py-8 hidden">
+        <!-- Current Player Section -->
+        <div class="max-w-6xl mx-auto mb-8">
+            <div id="currentPlayerCard" class="auction-card rounded-lg p-6 text-center text-white mb-6">
+                <h2 class="text-3xl font-bold mb-4">Current Player</h2>
+                <div id="playerInfo" class="text-xl"></div>
+                <div id="currentBid" class="text-4xl font-bold mt-4 text-yellow-300"></div>
+                <div id="auctionTimer" class="text-2xl mt-2"></div>
+            </div>
 
-      <div class="player-info">
-        <h3 id="playerCategory">Category: </h3>
-        <p id="playerName">Player: </p>
-        <button onclick="nextPlayer()">Next Player</button>
-      </div>
+            <!-- Bidding Section -->
+            <div class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6" id="biddingButtons">
+                <!-- Team bidding buttons will be generated here -->
+            </div>
 
-      <div class="bid-section">
-        <input type="text" id="bidderName" placeholder="Your Team Name" />
-        <input type="number" id="bidAmount" placeholder="Bid Amount" />
-        <button onclick="placeBid()">Place Bid</button>
-        <div id="lastBid"></div>
-      </div>
+            <!-- Auction Controls -->
+            <div class="text-center">
+                <button onclick="nextPlayer()" id="nextPlayerBtn"
+                        class="bg-green-600 hover:bg-green-700 text-white font-bold py-3 px-6 rounded-lg mr-4 disabled:opacity-50">
+                    Next Player
+                </button>
+                <button onclick="skipPlayer()" 
+                        class="bg-red-600 hover:bg-red-700 text-white font-bold py-3 px-6 rounded-lg">
+                    Skip Player
+                </button>
+            </div>
+        </div>
 
-      <div class="add-player">
-        <h4>Add New Player</h4>
-        <input type="text" id="newPlayerName" placeholder="Name" />
-        <input type="text" id="newCategory" placeholder="Category" />
-        <button onclick="addPlayer()">Add</button>
-      </div>
+        <!-- Teams & Stats Section -->
+        <div class="grid lg:grid-cols-3 gap-6">
+            <!-- Teams Overview -->
+            <div class="lg:col-span-2">
+                <h3 class="text-2xl font-bold mb-4">Teams & Budgets</h3>
+                <div id="teamsGrid" class="grid md:grid-cols-2 gap-4">
+                    <!-- Team cards will be generated here -->
+                </div>
+            </div>
 
-      <div class="log">
-        <h3>Sold Players</h3>
-        <ul id="soldPlayersList"></ul>
-      </div>
+            <!-- Remaining Players -->
+            <div>
+                <h3 class="text-2xl font-bold mb-4">Remaining Players</h3>
+                <div id="remainingPlayers" class="bg-gray-800 rounded-lg p-4 max-h-96 overflow-y-auto">
+                    <!-- Remaining players list -->
+                </div>
+            </div>
+        </div>
     </div>
-  </div>
 
-  <script src="script.js"></script>
+    <script>
+        let players = [];
+        let teams = [];
+        let currentPlayerIndex = 0;
+        let currentBid = 0;
+        let currentBidder = null;
+        let auctionTimer = null;
+        let timeLeft = 10;
+        let selectedSport = 'cricket';
+        let hasFirstBid = false;
+
+        // Sport configurations
+        const sportConfigs = {
+            cricket: {
+                positions: ['Batsman', 'Bowler', 'All-rounder', 'Wicket-keeper'],
+                teamNames: 'Mumbai Indians, Chennai Super Kings, Royal Challengers Bangalore, Delhi Capitals, Kolkata Knight Riders, Punjab Kings, Rajasthan Royals, Sunrisers Hyderabad',
+                samplePlayers: [
+                    {name: "Virat Kohli", position: "Batsman", basePrice: 2},
+                    {name: "MS Dhoni", position: "Wicket-keeper", basePrice: 2},
+                    {name: "Rohit Sharma", position: "Batsman", basePrice: 2},
+                    {name: "Jasprit Bumrah", position: "Bowler", basePrice: 2},
+                    {name: "KL Rahul", position: "Wicket-keeper", basePrice: 1},
+                    {name: "Rashid Khan", position: "All-rounder", basePrice: 1},
+                    {name: "David Warner", position: "Batsman", basePrice: 1.5},
+                    {name: "Pat Cummins", position: "Bowler", basePrice: 1}
+                ]
+            },
+            football: {
+                positions: ['Forward', 'Midfielder', 'Defender', 'Goalkeeper'],
+                teamNames: 'Manchester United, Arsenal, Chelsea, Liverpool, Manchester City, Tottenham, Newcastle, Brighton',
+                samplePlayers: [
+                    {name: "Lionel Messi", position: "Forward", basePrice: 3},
+                    {name: "Cristiano Ronaldo", position: "Forward", basePrice: 3},
+                    {name: "Kevin De Bruyne", position: "Midfielder", basePrice: 2.5},
+                    {name: "Virgil van Dijk", position: "Defender", basePrice: 2},
+                    {name: "Alisson Becker", position: "Goalkeeper", basePrice: 1.5},
+                    {name: "Erling Haaland", position: "Forward", basePrice: 2.5},
+                    {name: "Luka Modric", position: "Midfielder", basePrice: 1.5},
+                    {name: "Sergio Ramos", position: "Defender", basePrice: 1}
+                ]
+            },
+            basketball: {
+                positions: ['Point Guard', 'Shooting Guard', 'Small Forward', 'Power Forward', 'Center'],
+                teamNames: 'Lakers, Warriors, Celtics, Heat, Bulls, Knicks, Nets, 76ers',
+                samplePlayers: [
+                    {name: "LeBron James", position: "Small Forward", basePrice: 4},
+                    {name: "Stephen Curry", position: "Point Guard", basePrice: 3.5},
+                    {name: "Kevin Durant", position: "Power Forward", basePrice: 3},
+                    {name: "Giannis Antetokounmpo", position: "Power Forward", basePrice: 3.5},
+                    {name: "Luka Doncic", position: "Point Guard", basePrice: 3},
+                    {name: "Jayson Tatum", position: "Small Forward", basePrice: 2.5},
+                    {name: "Nikola Jokic", position: "Center", basePrice: 3},
+                    {name: "Damian Lillard", position: "Point Guard", basePrice: 2}
+                ]
+            },
+            kabaddi: {
+                positions: ['Raider', 'Defender', 'All-rounder'],
+                teamNames: 'Patna Pirates, Bengaluru Bulls, Dabang Delhi, U Mumba, Jaipur Pink Panthers, Tamil Thalaivas, Telugu Titans, Puneri Paltan',
+                samplePlayers: [
+                    {name: "Pardeep Narwal", position: "Raider", basePrice: 1.5},
+                    {name: "Pawan Sehrawat", position: "Raider", basePrice: 1.2},
+                    {name: "Fazel Atrachali", position: "Defender", basePrice: 1},
+                    {name: "Sandeep Narwal", position: "All-rounder", basePrice: 0.8},
+                    {name: "Rahul Chaudhari", position: "Raider", basePrice: 1},
+                    {name: "Manjeet Chhillar", position: "Defender", basePrice: 0.6},
+                    {name: "Deepak Hooda", position: "All-rounder", basePrice: 0.7},
+                    {name: "Surender Nada", position: "Defender", basePrice: 0.5}
+                ]
+            },
+            hockey: {
+                positions: ['Forward', 'Midfielder', 'Defender', 'Goalkeeper'],
+                teamNames: 'Kalinga Lancers, Dabang Mumbai, Ranchi Rays, Punjab Warriors, Delhi Waveriders, Jaypee Punjab Warriors, UP Wizards, Hyderabad Sultans',
+                samplePlayers: [
+                    {name: "Manpreet Singh", position: "Midfielder", basePrice: 1.5},
+                    {name: "Harmanpreet Singh", position: "Defender", basePrice: 1.2},
+                    {name: "PR Sreejesh", position: "Goalkeeper", basePrice: 1},
+                    {name: "Akashdeep Singh", position: "Forward", basePrice: 0.8},
+                    {name: "Rupinder Pal Singh", position: "Defender", basePrice: 0.9},
+                    {name: "Dilpreet Singh", position: "Forward", basePrice: 0.6},
+                    {name: "Hardik Singh", position: "Midfielder", basePrice: 0.7},
+                    {name: "Krishan Pathak", position: "Goalkeeper", basePrice: 0.5}
+                ]
+            },
+            volleyball: {
+                positions: ['Outside Hitter', 'Middle Blocker', 'Setter', 'Libero', 'Opposite Hitter'],
+                teamNames: 'Calicut Heroes, Chennai Spartans, Kochi Blue Spikers, Ahmedabad Defenders, Hyderabad Black Hawks, Mumbai Meteors, Kolkata Thunderbolts, Delhi Acers',
+                samplePlayers: [
+                    {name: "Jerome Vinith", position: "Outside Hitter", basePrice: 0.8},
+                    {name: "Ashwal Rai", position: "Setter", basePrice: 0.6},
+                    {name: "Naveen Raja Jacob", position: "Middle Blocker", basePrice: 0.5},
+                    {name: "Karthik Ashok", position: "Libero", basePrice: 0.4},
+                    {name: "Prince", position: "Opposite Hitter", basePrice: 0.7},
+                    {name: "Ranjit Singh", position: "Outside Hitter", basePrice: 0.6},
+                    {name: "Vinit Kumar", position: "Middle Blocker", basePrice: 0.5},
+                    {name: "Ajith Lal", position: "Setter", basePrice: 0.4}
+                ]
+            },
+            badminton: {
+                positions: ['Singles', 'Doubles', 'Mixed Doubles'],
+                teamNames: 'Hyderabad Hunters, Pune 7 Aces, Delhi Dashers, Chennai Smashers, Mumbai Rockets, Bengaluru Raptors, Awadhe Warriors, North Eastern Warriors',
+                samplePlayers: [
+                    {name: "PV Sindhu", position: "Singles", basePrice: 2},
+                    {name: "Kidambi Srikanth", position: "Singles", basePrice: 1.5},
+                    {name: "Saina Nehwal", position: "Singles", basePrice: 1.2},
+                    {name: "Chirag Shetty", position: "Doubles", basePrice: 0.8},
+                    {name: "Satwiksairaj Rankireddy", position: "Doubles", basePrice: 0.8},
+                    {name: "HS Prannoy", position: "Singles", basePrice: 1},
+                    {name: "Ashwini Ponnappa", position: "Mixed Doubles", basePrice: 0.6},
+                    {name: "Lakshya Sen", position: "Singles", basePrice: 1.2}
+                ]
+            },
+            tennis: {
+                positions: ['Singles', 'Doubles'],
+                teamNames: 'Indian Aces, UAE Royals, Singapore Slammers, Japan Warriors, Philippine Mavericks, Thailand Tigers, Malaysia Mavericks, Indonesia Eagles',
+                samplePlayers: [
+                    {name: "Novak Djokovic", position: "Singles", basePrice: 4},
+                    {name: "Rafael Nadal", position: "Singles", basePrice: 4},
+                    {name: "Roger Federer", position: "Singles", basePrice: 3.5},
+                    {name: "Serena Williams", position: "Singles", basePrice: 3},
+                    {name: "Andy Murray", position: "Singles", basePrice: 2.5},
+                    {name: "Stefanos Tsitsipas", position: "Singles", basePrice: 2},
+                    {name: "Simona Halep", position: "Singles", basePrice: 2},
+                    {name: "Alexander Zverev", position: "Singles", basePrice: 2.5}
+                ]
+            }
+        };
+
+        function updateSportSettings() {
+            selectedSport = document.getElementById('sportSelect').value;
+            const config = sportConfigs[selectedSport];
+            document.getElementById('teamNames').value = config.teamNames;
+        }
+
+        function handleFileUpload(event) {
+            const file = event.target.files[0];
+            if (!file) return;
+
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                try {
+                    const data = new Uint8Array(e.target.result);
+                    const workbook = XLSX.read(data, {type: 'array'});
+                    const firstSheet = workbook.Sheets[workbook.SheetNames[0]];
+                    const jsonData = XLSX.utils.sheet_to_json(firstSheet);
+                    
+                    players = jsonData.map(row => ({
+                        name: row.Name || row.name || 'Unknown',
+                        position: row.Position || row.position || 'Unknown',
+                        basePrice: parseFloat(row.BasePrice || row.basePrice || row['Base Price'] || 0.5)
+                    }));
+                    
+                    alert(`Successfully loaded ${players.length} players from Excel file!`);
+                } catch (error) {
+                    alert('Error reading Excel file. Please check the format.');
+                    console.error(error);
+                }
+            };
+            reader.readAsArrayBuffer(file);
+        }
+
+        function startAuction() {
+            const numTeams = parseInt(document.getElementById('numTeams').value);
+            const budget = parseFloat(document.getElementById('teamBudget').value);
+            const teamNamesText = document.getElementById('teamNames').value;
+            
+            if (players.length === 0) {
+                players = [...sportConfigs[selectedSport].samplePlayers];
+                alert(`Using sample ${selectedSport} player data. Upload an Excel file for custom players.`);
+            }
+
+            // Shuffle players
+            players = players.sort(() => Math.random() - 0.5);
+            
+            // Setup teams
+            const teamNames = teamNamesText.split(',').map(name => name.trim()).slice(0, numTeams);
+            teams = teamNames.map((name, index) => ({
+                id: index,
+                name: name,
+                budget: budget,
+                players: [],
+                slots: {batsman: 0, bowler: 0, allrounder: 0, wicketkeeper: 0}
+            }));
+
+            // Hide setup, show auction
+            document.getElementById('setupSection').classList.add('hidden');
+            document.getElementById('auctionSection').classList.remove('hidden');
+            
+            setupAuctionUI();
+            showCurrentPlayer();
+        }
+
+        function setupAuctionUI() {
+            // Create bidding buttons
+            const biddingContainer = document.getElementById('biddingButtons');
+            biddingContainer.innerHTML = teams.map(team => `
+                <button onclick="placeBid(${team.id})" id="bidBtn${team.id}"
+                        class="bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 px-4 rounded-lg
+                               transition duration-300 transform hover:scale-105">
+                    ${team.name}
+                </button>
+            `).join('');
+
+            updateTeamsDisplay();
+        }
+
+        function showCurrentPlayer() {
+            if (currentPlayerIndex >= players.length) {
+                endAuction();
+                return;
+            }
+
+            const player = players[currentPlayerIndex];
+            currentBid = player.basePrice;
+            currentBidder = null;
+            hasFirstBid = false;
+            
+            document.getElementById('playerInfo').innerHTML = `
+                <div class="text-3xl font-bold">${player.name}</div>
+                <div class="text-xl mt-2">${player.position}</div>
+                <div class="text-lg mt-1">Base Price: ₹${player.basePrice} Cr</div>
+            `;
+            
+            updateCurrentBid();
+            startTimer();
+            updateRemainingPlayers();
+            
+            // Enable all team buttons
+            teams.forEach(team => {
+                const btn = document.getElementById(`bidBtn${team.id}`);
+                btn.disabled = team.budget < currentBid;
+                btn.classList.toggle('opacity-50', team.budget < currentBid);
+            });
+        }
+
+        function placeBid(teamId) {
+            const team = teams[teamId];
+            let newBid;
+            
+            if (!hasFirstBid) {
+                // First bid is always the base price
+                newBid = currentBid;
+                hasFirstBid = true;
+            } else {
+                // Subsequent bids follow the increment rules
+                newBid = getNextBidAmount(currentBid);
+            }
+            
+            if (team.budget < newBid) {
+                alert(`${team.name} doesn't have enough budget!`);
+                return;
+            }
+
+            currentBid = newBid;
+            currentBidder = teamId;
+            
+            updateCurrentBid();
+            resetTimer();
+            
+            // Add bid animation
+            const btn = document.getElementById(`bidBtn${teamId}`);
+            btn.classList.add('bid-pulse');
+            setTimeout(() => btn.classList.remove('bid-pulse'), 500);
+            
+            // Update button states for next bid amount
+            const nextBidAmount = getNextBidAmount(currentBid);
+            teams.forEach(t => {
+                const button = document.getElementById(`bidBtn${t.id}`);
+                button.disabled = t.budget < nextBidAmount;
+                button.classList.toggle('opacity-50', t.budget < nextBidAmount);
+            });
+        }
+
+        function getNextBidAmount(current) {
+            if (current >= 8) {
+                return Math.ceil(current) + 1;
+            } else if (current >= 1) {
+                return current + 0.5;
+            } else {
+                return current + 0.05;
+            }
+        }
+
+        function updateCurrentBid() {
+            const bidText = currentBidder !== null ? 
+                `₹${currentBid.toFixed(2)} Cr - ${teams[currentBidder].name}` : 
+                `₹${currentBid.toFixed(2)} Cr - No bids yet`;
+            document.getElementById('currentBid').textContent = bidText;
+        }
+
+        function startTimer() {
+            timeLeft = 10;
+            updateTimer();
+            auctionTimer = setInterval(() => {
+                timeLeft--;
+                updateTimer();
+                if (timeLeft <= 0) {
+                    clearInterval(auctionTimer);
+                    if (currentBidder !== null) {
+                        soldPlayer();
+                    } else {
+                        skipPlayer();
+                    }
+                }
+            }, 1000);
+        }
+
+        function resetTimer() {
+            clearInterval(auctionTimer);
+            startTimer();
+        }
+
+        function updateTimer() {
+            document.getElementById('auctionTimer').textContent = `Time: ${timeLeft}s`;
+        }
+
+        function soldPlayer() {
+            if (currentBidder === null) return;
+            
+            const player = players[currentPlayerIndex];
+            const team = teams[currentBidder];
+            
+            // Add player to team
+            team.players.push({...player, boughtPrice: currentBid});
+            team.budget -= currentBid;
+            
+            // Update slots based on sport
+            const position = player.position.toLowerCase();
+            updateTeamSlots(team, position, selectedSport);
+            
+            alert(`${player.name} sold to ${team.name} for ₹${currentBid} Cr!`);
+            
+            nextPlayer();
+        }
+
+        function updateTeamSlots(team, position, sport) {
+            // Initialize slots based on sport if not exists
+            if (!team.slots || Object.keys(team.slots).length === 0) {
+                team.slots = {};
+                sportConfigs[sport].positions.forEach(pos => {
+                    team.slots[pos.toLowerCase().replace(/\s+/g, '')] = 0;
+                });
+            }
+
+            // Update slot count based on position
+            const normalizedPosition = position.replace(/\s+/g, '').toLowerCase();
+            
+            // Find matching slot key
+            const slotKey = Object.keys(team.slots).find(key => 
+                key.includes(normalizedPosition) || 
+                normalizedPosition.includes(key) ||
+                key === normalizedPosition
+            );
+            
+            if (slotKey) {
+                team.slots[slotKey]++;
+            } else {
+                // Fallback: create new slot if not found
+                team.slots[normalizedPosition] = (team.slots[normalizedPosition] || 0) + 1;
+            }
+        }
+
+        function nextPlayer() {
+            clearInterval(auctionTimer);
+            if (currentBidder !== null) {
+                soldPlayer();
+                return;
+            }
+            currentPlayerIndex++;
+            showCurrentPlayer();
+            updateTeamsDisplay();
+        }
+
+        function skipPlayer() {
+            clearInterval(auctionTimer);
+            currentPlayerIndex++;
+            showCurrentPlayer();
+        }
+
+        function updateTeamsDisplay() {
+            const container = document.getElementById('teamsGrid');
+            container.innerHTML = teams.map(team => {
+                const slotsDisplay = Object.entries(team.slots || {})
+                    .map(([position, count]) => {
+                        const displayName = position.charAt(0).toUpperCase() + position.slice(1);
+                        return `<span class="mr-2">${displayName}: ${count}</span>`;
+                    }).join('');
+                
+                return `
+                    <div class="team-slot rounded-lg p-4 text-white">
+                        <h4 class="font-bold text-lg">${team.name}</h4>
+                        <p class="text-sm">Budget: ₹${team.budget.toFixed(2)} Cr</p>
+                        <p class="text-sm">Players: ${team.players.length}</p>
+                        <div class="text-xs mt-2">
+                            ${slotsDisplay}
+                        </div>
+                        <div class="mt-2 text-xs">
+                            ${team.players.map(p => `${p.name} (₹${p.boughtPrice})`).join(', ')}
+                        </div>
+                    </div>
+                `;
+            }).join('');
+        }
+
+        function updateRemainingPlayers() {
+            const container = document.getElementById('remainingPlayers');
+            const remaining = players.slice(currentPlayerIndex + 1);
+            container.innerHTML = remaining.map(player => `
+                <div class="player-card rounded p-2 mb-2 text-white text-sm">
+                    <div class="font-semibold">${player.name}</div>
+                    <div class="text-xs">${player.position} - ₹${player.basePrice} Cr</div>
+                </div>
+            `).join('');
+        }
+
+        function endAuction() {
+            clearInterval(auctionTimer);
+            alert(`${selectedSport.charAt(0).toUpperCase() + selectedSport.slice(1)} auction completed! Check team compositions.`);
+            
+            // Show final results
+            let results = `${selectedSport.toUpperCase()} AUCTION RESULTS:\n\n`;
+            teams.forEach(team => {
+                results += `${team.name}:\n`;
+                results += `Budget remaining: ₹${team.budget.toFixed(2)} Cr\n`;
+                results += `Players (${team.players.length}):\n`;
+                team.players.forEach(player => {
+                    results += `- ${player.name} (${player.position}) - ₹${player.boughtPrice} Cr\n`;
+                });
+                results += '\n';
+            });
+            
+            console.log(results);
+        }
+
+        // Initialize file upload handler
+        document.getElementById('fileInput').addEventListener('change', handleFileUpload);
+    </script>
 </body>
 </html>
