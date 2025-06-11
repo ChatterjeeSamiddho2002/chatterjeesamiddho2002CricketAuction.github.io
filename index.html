@@ -441,11 +441,19 @@
         function startTimer() {
             timeLeft = 10;
             updateTimer();
+            
+            // Clear any existing timer first
+            if (auctionTimer) {
+                clearInterval(auctionTimer);
+            }
+            
             auctionTimer = setInterval(() => {
                 timeLeft--;
                 updateTimer();
                 if (timeLeft <= 0) {
                     clearInterval(auctionTimer);
+                    auctionTimer = null;
+                    
                     if (currentBidder !== null) {
                         soldPlayer();
                     } else {
@@ -456,7 +464,10 @@
         }
 
         function resetTimer() {
-            clearInterval(auctionTimer);
+            if (auctionTimer) {
+                clearInterval(auctionTimer);
+                auctionTimer = null;
+            }
             startTimer();
         }
 
@@ -564,7 +575,12 @@
         }
 
         function endAuction() {
-            clearInterval(auctionTimer);
+            // Clear any running timer
+            if (auctionTimer) {
+                clearInterval(auctionTimer);
+                auctionTimer = null;
+            }
+            
             alert(`${selectedSport.charAt(0).toUpperCase() + selectedSport.slice(1)} auction completed! Check team compositions.`);
             
             // Show final results
@@ -580,6 +596,20 @@
             });
             
             console.log(results);
+            
+            // Hide current player card and show restart option
+            document.getElementById('currentPlayerCard').innerHTML = `
+                <h2 class="text-3xl font-bold mb-4">🏆 Auction Completed!</h2>
+                <div class="text-xl mb-4">All players have been auctioned.</div>
+                <button onclick="location.reload()" 
+                        class="bg-green-600 hover:bg-green-700 text-white font-bold py-3 px-6 rounded-lg">
+                    Start New Auction
+                </button>
+            `;
+            
+            // Disable auction controls
+            document.getElementById('nextPlayerBtn').disabled = true;
+            document.getElementById('biddingButtons').innerHTML = '<div class="col-span-full text-center text-gray-400">Auction Completed</div>';
         }
 
         // Initialize file upload handler
