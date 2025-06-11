@@ -2,26 +2,51 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <title>Cricket Auction Manager</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Multi-Sport Auction</title>
   <link rel="stylesheet" href="style.css" />
 </head>
 <body>
   <div class="container">
-    <h1>Cricket Auction Manager</h1>
-    
-    <div class="settings">
-      <label>Number of Teams: <input type="number" id="teamCount" min="2" max="20" value="10"/></label>
-      <label>Budget per Team: <input type="number" id="teamBudget" min="1" value="100"/></label>
-      <button onclick="initializeTeams()">Initialize Teams</button>
-      <button onclick="startUnsoldRound()">Start Unsold Round</button>
+    <h1>Online Sports Auction</h1>
+
+    <div class="setup">
+      <label for="sport">Choose Sport:</label>
+      <select id="sport">
+        <option value="cricket">Cricket</option>
+        <option value="football">Football</option>
+        <option value="basketball">Basketball</option>
+      </select>
+      <button onclick="loadSport()">Start Auction</button>
     </div>
 
-    <div id="teamsContainer" class="teams-container"></div>
+    <div id="auctionSection" style="display:none;">
+      <h2 id="currentSportTitle"></h2>
 
-    <div class="unsold-section">
-      <h2>Unsold Players</h2>
-      <ul id="unsoldPlayers"></ul>
+      <div class="player-info">
+        <h3 id="playerCategory">Category: </h3>
+        <p id="playerName">Player: </p>
+        <button onclick="nextPlayer()">Next Player</button>
+      </div>
+
+      <div class="bid-section">
+        <input type="text" id="bidderName" placeholder="Your Team Name" />
+        <input type="number" id="bidAmount" placeholder="Bid Amount" />
+        <button onclick="placeBid()">Place Bid</button>
+        <div id="lastBid"></div>
+      </div>
+
+      <div class="add-player">
+        <h4>Add New Player</h4>
+        <input type="text" id="newPlayerName" placeholder="Name" />
+        <input type="text" id="newCategory" placeholder="Category" />
+        <button onclick="addPlayer()">Add</button>
+      </div>
+
+      <div class="log">
+        <h3>Sold Players</h3>
+        <ul id="soldPlayersList"></ul>
+      </div>
     </div>
   </div>
 

@@ -1,54 +1,57 @@
 body {
   font-family: Arial, sans-serif;
-  background-color: #f0f4f8;
+  background-color: #f4f4f4;
   margin: 0;
-  padding: 20px;
+  padding: 0;
 }
 
 .container {
-  max-width: 1200px;
-  margin: auto;
+  width: 90%;
+  max-width: 800px;
+  margin: 30px auto;
+  background-color: #fff;
+  padding: 20px;
+  border-radius: 10px;
+  box-shadow: 0 0 15px rgba(0, 0, 0, 0.1);
 }
 
-h1 {
+h1, h2, h3, h4 {
   text-align: center;
-  margin-bottom: 20px;
+  color: #333;
 }
 
-.settings {
-  display: flex;
-  gap: 10px;
-  justify-content: center;
-  margin-bottom: 20px;
+.setup, .player-info, .bid-section, .add-player, .log {
+  margin-top: 20px;
+  padding: 15px;
+  border: 1px solid #ccc;
+  border-radius: 8px;
+  background-color: #fafafa;
 }
 
-.settings input {
-  margin-left: 5px;
-  width: 60px;
+input, select, button {
+  padding: 10px;
+  margin: 5px 0;
+  width: 100%;
+  box-sizing: border-box;
 }
 
 button {
-  padding: 5px 10px;
+  background-color: #007bff;
+  color: white;
+  border: none;
   cursor: pointer;
 }
 
-.teams-container {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
-  gap: 15px;
+button:hover {
+  background-color: #0056b3;
 }
 
-.team-card {
-  background: #fff;
-  padding: 15px;
-  border-radius: 8px;
-  box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+#lastBid {
+  margin-top: 10px;
+  color: green;
 }
 
-.team-card h2 {
-  margin-top: 0;
-}
-
-.unsold-section {
-  margin-top: 30px;
+#soldPlayersList li {
+  margin-bottom: 5px;
+  color: #555;
 }
