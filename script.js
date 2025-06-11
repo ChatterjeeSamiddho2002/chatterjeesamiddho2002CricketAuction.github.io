@@ -1,226 +1,316 @@
-// Include Bootstrap via CDN in your HTML file:
-// <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+// Firebase config
+const firebaseConfig = {
+  apiKey: "AIzaSyA-nfEWO7BNx-XW4kRI5jqcEt-kVfxQ7T4",
+  authDomain: "auctionsite-backend.firebaseapp.com",
+  databaseURL: "https://auctionsite-backend-default-rtdb.firebaseio.com",
+  projectId: "auctionsite-backend",
+  storageBucket: "auctionsite-backend.appspot.com",
+  messagingSenderId: "232850109661",
+  appId: "1:232850109661:web:c2b7509b526ac925249734",
+  measurementId: "G-199LFVLV3S"
+};
+firebase.initializeApp(firebaseConfig);
+const db = firebase.database();
 
-let playersData = {
-  cricket: [],
-  football: [],
-  basketball: []
+// --- Variables for multiplayer state ---
+let auctionRef = null;
+let auctionState = null;
+let auctionId = null;
+let myTeamId = null;
+let myTeamName = null;
+let isPaused = false;
+let pausedTimeLeft = 0;
+
+// --- Sport configs (same as before, truncated for brevity) ---
+const sportConfigs = {
+  cricket: {
+    positions: ['Batsman', 'Bowler', 'All-rounder', 'Wicket-keeper'],
+    teamNames: 'Mumbai Indians, Chennai Super Kings, Royal Challengers Bangalore, Delhi Capitals, Kolkata Knight Riders, Punjab Kings, Rajasthan Royals, Sunrisers Hyderabad',
+    samplePlayers: [
+      {name: "Virat Kohli", position: "Batsman", basePrice: 2},
+      {name: "MS Dhoni", position: "Wicket-keeper", basePrice: 2},
+      {name: "Jasprit Bumrah", position: "Bowler", basePrice: 2}
+    ]
+  },
+  // ... (other sports as in your original code)
 };
 
-let currentPlayers = [];
-let currentSport = "";
-let currentIndex = 0;
-let currentCategory = "";
+function updateSportSettings() {
+  const selectedSport = document.getElementById('sportSelect').value;
+  const config = sportConfigs[selectedSport];
+  document.getElementById('teamNames').value = config.teamNames;
+}
+document.getElementById('sportSelect').addEventListener('change', updateSportSettings);
 
-let teams = [];
-let players = {};
-let unsoldPlayers = [];
-let currentBids = {}; // store current bids per player
+// --- File upload handler (Excel import, as before) ---
+let players = [];
+document.getElementById('fileInput').addEventListener('change', function(event) {
+  const file = event.target.files[0];
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = function(e) {
+    try {
+      const data = new Uint8Array(e.target.result);
+      const workbook = XLSX.read(data, {type: 'array'});
+      const firstSheet = workbook.Sheets[workbook.SheetNames[0]];
+      const jsonData = XLSX.utils.sheet_to_json(firstSheet);
+      players = jsonData.map(row => ({
+        name: row.Name || row.name || 'Unknown',
+        position: row.Position || row.position || 'Unknown',
+        basePrice: parseFloat(row.BasePrice || row.basePrice || row['Base Price'] || 0.5)
+      }));
+      alert(`Successfully loaded ${players.length} players from Excel file!`);
+    } catch (error) {
+      alert('Error reading Excel file. Please check the format.');
+      console.error(error);
+    }
+  };
+  reader.readAsArrayBuffer(file);
+});
 
-function initializeTeams() {
-  const teamCount = parseInt(document.getElementById("teamCount").value);
-  const budget = parseInt(document.getElementById("teamBudget").value);
-  teams = [];
-  players = {};
-  unsoldPlayers = [];
-  currentBids = {};
-
-  for (let i = 1; i <= teamCount; i++) {
-    teams.push({
-      name: `Team ${i}`,
-      budget: budget,
-      players: [],
-    });
+// --- Start Auction (multiplayer aware) ---
+function startAuction() {
+  auctionId = document.getElementById('roomCode').value.trim();
+  myTeamName = document.getElementById('yourTeamName').value.trim();
+  if (!auctionId || !myTeamName) {
+    alert("Enter both room code and your team name!");
+    return;
   }
+  auctionRef = db.ref('auctions/' + auctionId);
 
-  renderTeams();
-  renderUnsoldPlayers();
-}
-
-function loadSport() {
-  currentSport = document.getElementById("sport").value;
-  currentPlayers = shuffle([...playersData[currentSport]]);
-  currentPlayers.sort((a, b) => a.category.localeCompare(b.category)); // sort by category
-  currentIndex = 0;
-  currentCategory = "";
-  document.getElementById("currentSportTitle").textContent = `Auction: ${currentSport.toUpperCase()}`;
-  document.getElementById("auctionSection").style.display = "block";
-  showPlayer();
-}
-
-function shuffle(array) {
-  for (let i = array.length - 1; i > 0; i--) {
-    const j = Math.floor(Math.random() * (i + 1));
-    [array[i], array[j]] = [array[j], array[i]];
-  }
-  return array;
-}
-
-function showPlayer() {
-  const categoryHeading = document.getElementById("categoryHeading");
-  if (currentIndex < currentPlayers.length) {
-    const player = currentPlayers[currentIndex];
-    document.getElementById("playerCategory").innerHTML = `<span class='badge bg-secondary'>Category: ${player.category}</span>`;
-    document.getElementById("playerName").innerHTML = `<h4 class='text-primary'>Player: ${player.name}</h4>`;
-
-    if (player.category !== currentCategory) {
-      currentCategory = player.category;
-      categoryHeading.innerHTML = `<h5 class='text-warning'>--- ${currentCategory} ---</h5>`;
+  auctionRef.once('value', snap => {
+    let state = snap.val();
+    if (!state) {
+      // Create new auction room
+      myTeamId = 0;
+      const selectedSport = document.getElementById('sportSelect').value;
+      const config = sportConfigs[selectedSport];
+      const numTeams = parseInt(document.getElementById('numTeams').value);
+      const budget = parseFloat(document.getElementById('teamBudget').value);
+      const teamNamesText = document.getElementById('teamNames').value;
+      let initPlayers = players.length ? players : config.samplePlayers;
+      // Shuffle players
+      initPlayers = initPlayers.sort(() => Math.random() - 0.5);
+      // Setup teams
+      const teamNames = teamNamesText.split(',').map(name => name.trim()).slice(0, numTeams);
+      const teams = teamNames.map((name, index) => ({
+        id: index,
+        name: name,
+        budget: budget,
+        players: [],
+        slots: {}
+      }));
+      // Ensure myTeamName is in teams
+      if (!teamNames.includes(myTeamName)) {
+        myTeamId = teams.length;
+        teams.push({id: myTeamId, name: myTeamName, budget: budget, players: [], slots: {}});
+      } else {
+        myTeamId = teamNames.indexOf(myTeamName);
+      }
+      auctionRef.set({
+        players: initPlayers,
+        teams: teams,
+        currentPlayerIndex: 0,
+        currentBid: initPlayers[0].basePrice,
+        currentBidder: null,
+        status: "running",
+        logs: []
+      });
     } else {
-      categoryHeading.innerHTML = "";
+      // Join existing team or add new one
+      let found = false;
+      if (state.teams) {
+        state.teams.forEach((team, idx) => {
+          if (team.name.toLowerCase() === myTeamName.toLowerCase()) {
+            myTeamId = team.id;
+            found = true;
+          }
+        });
+      }
+      if (!found) {
+        myTeamId = (state.teams && state.teams.length) ? state.teams.length : 0;
+        let newTeam = { id: myTeamId, name: myTeamName, budget: 100, players: [], slots: {} };
+        auctionRef.child('teams').transaction(teams => {
+          if (!teams) teams = [];
+          teams.push(newTeam);
+          return teams;
+        });
+      }
     }
+  });
 
-    currentBids = {};
-    document.getElementById("lastBid").innerHTML = "";
-  } else {
-    document.getElementById("playerCategory").textContent = "No more players";
-    document.getElementById("playerName").textContent = "";
-    document.getElementById("lastBid").textContent = "";
-    categoryHeading.textContent = "";
-  }
+  // Listen for changes
+  auctionRef.on('value', snap => {
+    auctionState = snap.val();
+    if (auctionState) updateAuctionUI();
+  });
+
+  document.getElementById('setupSection').classList.add('hidden');
+  document.getElementById('auctionSection').classList.remove('hidden');
 }
 
-function placeBid() {
-  const name = document.getElementById("bidderName").value.trim();
-  const amount = parseFloat(document.getElementById("bidAmount").value.trim());
-  if (!name || isNaN(amount)) {
-    alert("Enter both bidder name and valid amount");
+// --- UI Update Logic (all from auctionState) ---
+function updateAuctionUI() {
+  if (!auctionState || !auctionState.players || auctionState.currentPlayerIndex >= auctionState.players.length) {
+    endAuction();
     return;
   }
+  // Current Player
+  const player = auctionState.players[auctionState.currentPlayerIndex];
+  document.getElementById('playerInfo').innerHTML = `
+    <div class="text-3xl font-bold">${player.name}</div>
+    <div class="text-xl mt-2">${player.position}</div>
+    <div class="text-lg mt-1">Base Price: ₹${player.basePrice} Cr</div>
+  `;
+  // Current Bid
+  document.getElementById('currentBid').textContent =
+    auctionState.currentBidder !== null && auctionState.teams[auctionState.currentBidder]
+      ? `₹${auctionState.currentBid.toFixed(2)} Cr - ${auctionState.teams[auctionState.currentBidder].name}`
+      : `₹${auctionState.currentBid.toFixed(2)} Cr - No bids yet`;
+  // Timer (not implemented in this minimal version)
+  document.getElementById('auctionTimer').textContent = auctionState.status === "paused" ? "Paused" : "";
 
-  if (currentIndex >= currentPlayers.length) return;
+  // Bidding Buttons
+  const biddingContainer = document.getElementById('biddingButtons');
+  biddingContainer.innerHTML = auctionState.teams.map(team => `
+    <button onclick="placeBid(${team.id})" id="bidBtn${team.id}"
+      class="bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 px-4 rounded-lg transition duration-300 transform hover:scale-105"
+      ${auctionState.status !== "running" || team.budget < getNextBidAmount(auctionState.currentBid) ? "disabled" : ""}>
+      ${team.name}
+    </button>
+  `).join('');
 
-  const teamIndex = teams.findIndex(t => t.name.toLowerCase() === name.toLowerCase());
-  if (teamIndex === -1) {
-    alert("Team not found. Check team name.");
-    return;
-  }
-
-  const team = teams[teamIndex];
-  const player = currentPlayers[currentIndex];
-
-  if (team.budget < amount) {
-    alert("Insufficient budget.");
-    return;
-  }
-
-  if (team.players.length >= 25) {
-    alert("Maximum player limit reached.");
-    return;
-  }
-
-  if (players[player.name]) {
-    alert("Player already sold.");
-    return;
-  }
-
-  currentBids[name] = amount;
-  updateBidDisplay();
-}
-
-function finalizeBid() {
-  const player = currentPlayers[currentIndex];
-  if (!player) return;
-
-  let highestBid = 0;
-  let winningTeam = null;
-
-  for (let teamName in currentBids) {
-    if (currentBids[teamName] > highestBid) {
-      highestBid = currentBids[teamName];
-      winningTeam = teamName;
-    }
-  }
-
-  if (winningTeam) {
-    const team = teams.find(t => t.name === winningTeam);
-    team.players.push(`🟢 ${player.name}`);
-    team.budget -= highestBid;
-    players[player.name] = team.name;
-    document.getElementById("lastBid").innerHTML = `<div class='alert alert-success'>🎉 Sold to <strong>${winningTeam}</strong> for ₹${highestBid}</div>`;
-  } else {
-    if (!unsoldPlayers.includes(`🔴 ${player.name}`)) {
-      unsoldPlayers.push(`🔴 ${player.name}`);
-    }
-    document.getElementById("lastBid").innerHTML = `<div class='alert alert-danger'>❌ Unsold</div>`;
-  }
-
-  nextPlayer();
-  renderTeams();
-  renderUnsoldPlayers();
-}
-
-function updateBidDisplay() {
-  const bidEntries = Object.entries(currentBids).sort((a, b) => b[1] - a[1]);
-  const display = bidEntries.map(([team, amount], index) => {
-    const badgeClass = index === 0 ? "bg-success text-light" : "bg-secondary text-white";
-    return `<span class='badge ${badgeClass} m-1 p-2'>${team}: ₹${amount}</span>`;
-  }).join(" ");
-  document.getElementById("lastBid").innerHTML = display;
-}
-
-function nextPlayer() {
-  currentIndex++;
-  showPlayer();
-}
-
-function startUnsoldRound() {
-  if (unsoldPlayers.length === 0) {
-    alert("No unsold players to re-auction.");
-    return;
-  }
-  alert("Unsold players are now back in the auction.");
-  currentPlayers = shuffle([...unsoldPlayers.map(name => {
-    const cleanName = name.replace("🔴", "").trim();
-    return { name: cleanName, category: "Unknown" };
-  })]);
-  currentPlayers.sort((a, b) => a.category.localeCompare(b.category));
-  currentIndex = 0;
-  currentCategory = "";
-  unsoldPlayers = [];
-  showPlayer();
-}
-
-function renderTeams() {
-  const container = document.getElementById("teamsContainer");
-  container.innerHTML = "";
-
-  teams.forEach(team => {
-    const card = document.createElement("div");
-    card.className = "card m-2 shadow-sm";
-    card.innerHTML = `
-      <div class='card-body'>
-        <h5 class='card-title'>${team.name}</h5>
-        <p class='card-text'><strong>Budget Left:</strong> ₹${team.budget}</p>
-        <p class='card-text'><strong>Players (${team.players.length}/25):</strong></p>
-        <ul class='list-group list-group-flush'>
-          ${team.players.map(p => `<li class='list-group-item'>${p}</li>`).join("")}
-        </ul>
+  // Teams Overview
+  const container = document.getElementById('teamsGrid');
+  container.innerHTML = auctionState.teams.map(team => {
+    const slotsDisplay = Object.entries(team.slots || {})
+      .map(([position, count]) => {
+        const displayName = position.charAt(0).toUpperCase() + position.slice(1);
+        return `<span class="mr-2">${displayName}: ${count}</span>`;
+      }).join('');
+    return `
+      <div class="team-slot rounded-lg p-4 text-white">
+        <h4 class="font-bold text-lg">${team.name}</h4>
+        <p class="text-sm">Budget: ₹${team.budget.toFixed(2)} Cr</p>
+        <p class="text-sm">Players: ${team.players.length}</p>
+        <div class="text-xs mt-2">${slotsDisplay}</div>
+        <div class="mt-2 text-xs">
+          ${team.players.map(p => `${p.name} (₹${p.boughtPrice})`).join(', ')}
+        </div>
       </div>
     `;
-    container.appendChild(card);
+  }).join('');
+
+  // Remaining Players
+  const remaining = auctionState.players.slice(auctionState.currentPlayerIndex + 1);
+  document.getElementById('remainingPlayers').innerHTML = remaining.map(player => `
+    <div class="player-card rounded p-2 mb-2 text-white text-sm">
+      <div class="font-semibold">${player.name}</div>
+      <div class="text-xs">${player.position} - ₹${player.basePrice} Cr</div>
+    </div>
+  `).join('');
+}
+
+// --- Multiplayer Bidding ---
+function placeBid(teamId) {
+  if (!auctionState || auctionState.status !== "running") return;
+  const nextBid = getNextBidAmount(auctionState.currentBid);
+  auctionRef.transaction(state => {
+    if (!state) return;
+    if (state.status !== "running") return state;
+    const team = state.teams[teamId];
+    if (!team) return state;
+    if (team.budget >= nextBid && nextBid > state.currentBid) {
+      state.currentBid = nextBid;
+      state.currentBidder = teamId;
+      state.logs = state.logs || [];
+      state.logs.push(`${team.name} bid ₹${nextBid}`);
+    }
+    return state;
   });
 }
 
-function renderUnsoldPlayers() {
-  const list = document.getElementById("unsoldPlayers");
-  list.innerHTML = unsoldPlayers.map(p => `<li class='list-group-item text-danger'>${p}</li>`).join("");
+// --- Next Player ---
+function nextPlayer() {
+  if (!auctionState) return;
+  auctionRef.transaction(state => {
+    if (!state) return;
+    if (state.currentBidder !== null) {
+      // Sell player to team
+      const player = state.players[state.currentPlayerIndex];
+      const team = state.teams[state.currentBidder];
+      if (team && team.budget >= state.currentBid) {
+        team.players.push({...player, boughtPrice: state.currentBid});
+        team.budget -= state.currentBid;
+        // Update slots
+        const position = player.position.toLowerCase();
+        if (!team.slots) team.slots = {};
+        team.slots[position] = (team.slots[position] || 0) + 1;
+        state.logs = state.logs || [];
+        state.logs.push(`${player.name} SOLD to ${team.name} for ₹${state.currentBid} Cr`);
+      }
+    }
+    state.currentPlayerIndex++;
+    if (state.currentPlayerIndex < state.players.length) {
+      const nextPlayer = state.players[state.currentPlayerIndex];
+      state.currentBid = nextPlayer.basePrice;
+      state.currentBidder = null;
+    }
+    return state;
+  });
 }
 
-function addPlayer() {
-  const name = document.getElementById("newPlayerName").value.trim();
-  const category = document.getElementById("newCategory").value.trim();
+// --- Skip Player ---
+function skipPlayer() {
+  if (!auctionState) return;
+  auctionRef.transaction(state => {
+    if (!state) return;
+    state.logs = state.logs || [];
+    const player = state.players[state.currentPlayerIndex];
+    state.logs.push(`${player.name} was skipped`);
+    state.currentPlayerIndex++;
+    if (state.currentPlayerIndex < state.players.length) {
+      const nextPlayer = state.players[state.currentPlayerIndex];
+      state.currentBid = nextPlayer.basePrice;
+      state.currentBidder = null;
+    }
+    return state;
+  });
+}
 
-  if (!name || !category) {
-    alert("Please enter both name and category");
-    return;
+// --- Pause/Resume Auction ---
+function togglePause() {
+  if (!auctionState) return;
+  if (auctionState.status === "paused") {
+    auctionRef.update({ status: "running" });
+    document.getElementById('pauseBtn').textContent = "Pause";
+  } else {
+    auctionRef.update({ status: "paused" });
+    document.getElementById('pauseBtn').textContent = "Resume";
   }
+}
 
-  const newPlayer = { name, category };
-  playersData[currentSport].push(newPlayer);
-  currentPlayers.push(newPlayer);
-  alert("✅ Player added successfully!");
+// --- End Auction ---
+function endAuction() {
+  document.getElementById('currentPlayerCard').innerHTML = `
+    <h2 class="text-3xl font-bold mb-4">🏆 Auction Completed!</h2>
+    <div class="text-xl mb-4">All players have been auctioned.</div>
+    <button onclick="location.reload()" 
+      class="bg-green-600 hover:bg-green-700 text-white font-bold py-3 px-6 rounded-lg">
+      Start New Auction
+    </button>
+  `;
+  document.getElementById('nextPlayerBtn').disabled = true;
+  document.getElementById('biddingButtons').innerHTML = '<div class="col-span-full text-center text-gray-400">Auction Completed</div>';
+}
 
-  document.getElementById("newPlayerName").value = "";
-  document.getElementById("newCategory").value = "";
+// --- Bid increment logic ---
+function getNextBidAmount(current) {
+  if (current >= 8) {
+    return Math.ceil(current) + 1;
+  } else if (current >= 1) {
+    return current + 0.5;
+  } else {
+    return current + 0.05;
+  }
 }

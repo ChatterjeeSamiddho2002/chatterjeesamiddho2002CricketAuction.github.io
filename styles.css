@@ -1,57 +1,22 @@
-body {
-  font-family: Arial, sans-serif;
-  background-color: #f4f4f4;
-  margin: 0;
-  padding: 0;
+.auction-card {
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  transform: perspective(1000px) rotateX(0deg);
+  transition: all 0.3s ease;
 }
-
-.container {
-  width: 90%;
-  max-width: 800px;
-  margin: 30px auto;
-  background-color: #fff;
-  padding: 20px;
-  border-radius: 10px;
-  box-shadow: 0 0 15px rgba(0, 0, 0, 0.1);
+.auction-card:hover {
+  transform: perspective(1000px) rotateX(5deg) scale(1.02);
 }
-
-h1, h2, h3, h4 {
-  text-align: center;
-  color: #333;
+.bid-pulse {
+  animation: pulse 0.5s ease-in-out;
 }
-
-.setup, .player-info, .bid-section, .add-player, .log {
-  margin-top: 20px;
-  padding: 15px;
-  border: 1px solid #ccc;
-  border-radius: 8px;
-  background-color: #fafafa;
+@keyframes pulse {
+  0% { transform: scale(1); }
+  50% { transform: scale(1.1); }
+  100% { transform: scale(1); }
 }
-
-input, select, button {
-  padding: 10px;
-  margin: 5px 0;
-  width: 100%;
-  box-sizing: border-box;
+.team-slot {
+  background: linear-gradient(45deg, #f093fb 0%, #f5576c 100%);
 }
-
-button {
-  background-color: #007bff;
-  color: white;
-  border: none;
-  cursor: pointer;
-}
-
-button:hover {
-  background-color: #0056b3;
-}
-
-#lastBid {
-  margin-top: 10px;
-  color: green;
-}
-
-#soldPlayersList li {
-  margin-bottom: 5px;
-  color: #555;
+.player-card {
+  background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%);
 }

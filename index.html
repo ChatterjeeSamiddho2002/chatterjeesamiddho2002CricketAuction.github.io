@@ -2,186 +2,112 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <title>Realtime Auction Demo</title>
-  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Multi-Sport Player Auction System</title>
+  <!-- Tailwind CDN -->
+  <link href="https://cdnjs.cloudflare.com/ajax/libs/tailwindcss/2.2.19/tailwind.min.css" rel="stylesheet">
+  <link rel="stylesheet" href="style.css">
   <!-- Firebase SDKs -->
   <script src="https://www.gstatic.com/firebasejs/9.6.1/firebase-app-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/9.6.1/firebase-database-compat.js"></script>
-  <style>
-    body { font-family: sans-serif; background: #f5f5fa; color: #222; }
-    .container { max-width: 400px; margin: 40px auto; background: #fff; border-radius: 10px; box-shadow: 0 4px 16px #0001; padding: 2em; }
-    h2, h3 { text-align: center; }
-    label { display: block; margin-top: 1em; }
-    input, button { width: 100%; padding: 0.5em; margin-top: 0.5em; }
-    button { background: #6c63ff; color: #fff; border: none; border-radius: 5px; font-weight: bold; cursor: pointer; }
-    button:disabled { background: #ccc; cursor: not-allowed; }
-    .status { margin: 1em 0; text-align: center; }
-    .paused { color: #ff9800; font-weight: bold; }
-    .bidder { color: #388e3c; font-weight: bold; }
-    .log { font-size: 0.9em; background: #f0f0f0; border-radius: 5px; padding: 0.5em; margin-top: 1em; max-height: 100px; overflow-y: auto; }
-  </style>
 </head>
-<body>
-  <div class="container">
-    <h2>Realtime Auction</h2>
-    <div id="joinArea">
-      <label>Room Code (share with friends):</label>
-      <input id="roomInput" placeholder="e.g. test123" autocomplete="off" />
-      <label>Your Team Name:</label>
-      <input id="teamInput" placeholder="e.g. Mumbai Indians" autocomplete="off" />
-      <button onclick="joinAuction()">Join Auction</button>
+<body class="bg-gray-900 text-white min-h-screen">
+  <!-- Header -->
+  <header class="bg-gradient-to-r from-purple-800 to-indigo-800 shadow-lg">
+    <div class="container mx-auto px-4 py-6">
+      <h1 class="text-4xl font-bold text-center">🏆 Multi-Sport Player Auction System</h1>
     </div>
-    <div id="auctionArea" style="display:none;">
-      <h3 id="playerName"></h3>
-      <div>
-        <div>Current Bid: <span id="currentBid"></span></div>
-        <div>Current Bidder: <span id="currentBidder"></span></div>
+  </header>
+
+  <!-- Setup Section -->
+  <div id="setupSection" class="container mx-auto px-4 py-8">
+    <div class="max-w-4xl mx-auto">
+      <div class="bg-gray-800 rounded-lg p-6 mb-6">
+        <h2 class="text-2xl font-bold mb-4">Setup Auction</h2>
+        <!-- Multiplayer -->
+        <div class="mb-6">
+          <label class="block text-sm font-medium mb-2">Room Code (for multiplayer)</label>
+          <input type="text" id="roomCode" class="w-full p-3 bg-gray-700 border border-gray-600 rounded-lg" placeholder="e.g. test123">
+        </div>
+        <div class="mb-6">
+          <label class="block text-sm font-medium mb-2">Your Team Name</label>
+          <input type="text" id="yourTeamName" class="w-full p-3 bg-gray-700 border border-gray-600 rounded-lg" placeholder="e.g. Mumbai Indians">
+        </div>
+        <!-- Sport Selection -->
+        <div class="mb-6">
+          <label class="block text-sm font-medium mb-2">Select Sport</label>
+          <select id="sportSelect" class="w-full p-3 bg-gray-700 border border-gray-600 rounded-lg">
+            <option value="cricket">🏏 Cricket</option>
+            <option value="football">⚽ Football</option>
+            <option value="basketball">🏀 Basketball</option>
+            <option value="kabaddi">🤼 Kabaddi</option>
+            <option value="hockey">🏑 Hockey</option>
+            <option value="volleyball">🏐 Volleyball</option>
+            <option value="badminton">🏸 Badminton</option>
+            <option value="tennis">🎾 Tennis</option>
+          </select>
+        </div>
+        <!-- File Upload -->
+        <div class="mb-6">
+          <label class="block text-sm font-medium mb-2">Upload Player Dataset (Excel)</label>
+          <input type="file" id="fileInput" accept=".xlsx,.xls" class="w-full p-3 bg-gray-700 border border-gray-600 rounded-lg">
+        </div>
+        <!-- Teams Setup -->
+        <div class="grid md:grid-cols-2 gap-6 mb-6">
+          <div>
+            <label class="block text-sm font-medium mb-2">Number of Teams</label>
+            <input type="number" id="numTeams" value="8" min="2" max="12" class="w-full p-3 bg-gray-700 border border-gray-600 rounded-lg">
+          </div>
+          <div>
+            <label class="block text-sm font-medium mb-2">Budget per Team (Crores)</label>
+            <input type="number" id="teamBudget" value="100" min="50" max="200" class="w-full p-3 bg-gray-700 border border-gray-600 rounded-lg">
+          </div>
+        </div>
+        <!-- Team Names -->
+        <div class="mb-6">
+          <label class="block text-sm font-medium mb-2">Team Names (comma-separated)</label>
+          <textarea id="teamNames" rows="3"
+            class="w-full p-3 bg-gray-700 border border-gray-600 rounded-lg"
+            placeholder="Team names will auto-populate based on sport...">Mumbai Indians, Chennai Super Kings, Royal Challengers Bangalore, Delhi Capitals, Kolkata Knight Riders, Punjab Kings, Rajasthan Royals, Sunrisers Hyderabad</textarea>
+        </div>
+        <button onclick="startAuction()" class="w-full bg-gradient-to-r from-green-500 to-blue-500 hover:from-green-600 hover:to-blue-600 text-white font-bold py-3 px-6 rounded-lg transition duration-300">
+          Start Auction
+        </button>
       </div>
-      <div class="status">
-        Status: <span id="auctionStatus"></span>
-      </div>
-      <input id="bidInput" type="number" placeholder="Your bid" step="0.01" min="0" />
-      <button onclick="placeBid()">Place Bid</button>
-      <button onclick="pauseAuction()">Pause</button>
-      <button onclick="resumeAuction()">Resume</button>
-      <div class="log" id="logArea"></div>
     </div>
   </div>
-  <script>
-    // 1. Paste your Firebase config here
-    const firebaseConfig = {
-      apiKey: "AIzaSyA-nfEWO7BNx-XW4kRI5jqcEt-kVfxQ7T4",
-      authDomain: "auctionsite-backend.firebaseapp.com",
-      databaseURL: "https://auctionsite-backend-default-rtdb.firebaseio.com",
-      projectId: "auctionsite-backend",
-      storageBucket: "auctionsite-backend.appspot.com",
-      messagingSenderId: "232850109661",
-      appId: "1:232850109661:web:c2b7509b526ac925249734",
-      measurementId: "G-199LFVLV3S"
-    };
-    firebase.initializeApp(firebaseConfig);
-    const db = firebase.database();
 
-    let auctionRef = null;
-    let auctionState = null;
-    let auctionId = null;
-    let myTeamId = null;
-    let myTeamName = null;
-
-    // 2. Join or create auction room
-    function joinAuction() {
-      auctionId = document.getElementById('roomInput').value.trim();
-      myTeamName = document.getElementById('teamInput').value.trim();
-      if (!auctionId || !myTeamName) {
-        alert("Enter both room code and your team name!");
-        return;
-      }
-      auctionRef = db.ref('auctions/' + auctionId);
-
-      // Try to join an existing team or create a new one
-      auctionRef.once('value', snap => {
-        let state = snap.val();
-        if (!state) {
-          // Create new auction room
-          myTeamId = 0;
-          auctionRef.set({
-            players: [
-              { name: "Virat Kohli", position: "Batsman", basePrice: 2 }
-            ],
-            teams: [
-              { id: 0, name: myTeamName, budget: 10, players: [] }
-            ],
-            currentPlayerIndex: 0,
-            currentBid: 2,
-            currentBidder: null,
-            status: "running",
-            logs: []
-          });
-        } else {
-          // Check if team already exists
-          let found = false;
-          if (state.teams) {
-            state.teams.forEach((team, idx) => {
-              if (team.name.toLowerCase() === myTeamName.toLowerCase()) {
-                myTeamId = team.id;
-                found = true;
-              }
-            });
-          }
-          if (!found) {
-            // Add new team
-            myTeamId = (state.teams && state.teams.length) ? state.teams.length : 0;
-            let newTeam = { id: myTeamId, name: myTeamName, budget: 10, players: [] };
-            auctionRef.child('teams').transaction(teams => {
-              if (!teams) teams = [];
-              teams.push(newTeam);
-              return teams;
-            });
-          }
-        }
-      });
-
-      // Listen for changes
-      auctionRef.on('value', snap => {
-        auctionState = snap.val();
-        if (auctionState) updateUI();
-      });
-
-      document.getElementById('joinArea').style.display = 'none';
-      document.getElementById('auctionArea').style.display = '';
-    }
-
-    // 3. Update UI with auction state
-    function updateUI() {
-      const player = auctionState.players[auctionState.currentPlayerIndex];
-      document.getElementById('playerName').textContent = player ? player.name : "No player";
-      document.getElementById('currentBid').textContent = auctionState.currentBid;
-      document.getElementById('currentBidder').textContent =
-        auctionState.currentBidder !== null && auctionState.teams[auctionState.currentBidder]
-          ? auctionState.teams[auctionState.currentBidder].name
-          : "None";
-      document.getElementById('auctionStatus').textContent = auctionState.status;
-      document.getElementById('auctionStatus').className = auctionState.status === "paused" ? "paused" : "";
-      document.getElementById('bidInput').disabled = (auctionState.status !== "running");
-
-      // Show log
-      let logHtml = "";
-      if (auctionState.logs) {
-        auctionState.logs.slice(-10).forEach(log => {
-          logHtml += `<div>${log}</div>`;
-        });
-      }
-      document.getElementById('logArea').innerHTML = logHtml;
-    }
-
-    // 4. Place a bid (only if auction running and you have enough budget)
-    function placeBid() {
-      const bid = parseFloat(document.getElementById('bidInput').value);
-      if (isNaN(bid)) return alert("Enter a valid bid");
-      auctionRef.transaction(state => {
-        if (!state) return;
-        if (state.status !== "running") return state;
-        if (!state.teams || myTeamId === null) return state;
-        const myTeam = state.teams[myTeamId];
-        if (!myTeam) return state;
-        if (bid > state.currentBid && myTeam.budget >= bid) {
-          state.currentBid = bid;
-          state.currentBidder = myTeamId;
-          state.logs = state.logs || [];
-          state.logs.push(`${myTeam.name} bid ₹${bid}`);
-        }
-        return state;
-      });
-      document.getElementById('bidInput').value = "";
-    }
-
-    // 5. Pause and resume
-    function pauseAuction() {
-      auctionRef.update({ status: "paused" });
-    }
-    function resumeAuction() {
-      auctionRef.update({ status: "running" });
-    }
-  </script>
+  <!-- Auction Section -->
+  <div id="auctionSection" class="container mx-auto px-4 py-8 hidden">
+    <!-- Current Player Section -->
+    <div class="max-w-6xl mx-auto mb-8">
+      <div id="currentPlayerCard" class="auction-card rounded-lg p-6 text-center text-white mb-6">
+        <h2 class="text-3xl font-bold mb-4">Current Player</h2>
+        <div id="playerInfo" class="text-xl"></div>
+        <div id="currentBid" class="text-4xl font-bold mt-4 text-yellow-300"></div>
+        <div id="auctionTimer" class="text-2xl mt-2"></div>
+      </div>
+      <!-- Bidding Section -->
+      <div class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6" id="biddingButtons"></div>
+      <!-- Auction Controls -->
+      <div class="text-center">
+        <button onclick="nextPlayer()" id="nextPlayerBtn" class="bg-green-600 hover:bg-green-700 text-white font-bold py-3 px-6 rounded-lg mr-4 disabled:opacity-50">Next Player</button>
+        <button onclick="skipPlayer()" class="bg-red-600 hover:bg-red-700 text-white font-bold py-3 px-6 rounded-lg">Skip Player</button>
+        <button onclick="togglePause()" id="pauseBtn" class="bg-yellow-500 hover:bg-yellow-600 text-white font-bold py-3 px-6 rounded-lg ml-4">Pause</button>
+      </div>
+    </div>
+    <!-- Teams & Stats Section -->
+    <div class="grid lg:grid-cols-3 gap-6">
+      <div class="lg:col-span-2">
+        <h3 class="text-2xl font-bold mb-4">Teams & Budgets</h3>
+        <div id="teamsGrid" class="grid md:grid-cols-2 gap-4"></div>
+      </div>
+      <div>
+        <h3 class="text-2xl font-bold mb-4">Remaining Players</h3>
+        <div id="remainingPlayers" class="bg-gray-800 rounded-lg p-4 max-h-96 overflow-y-auto"></div>
+      </div>
+    </div>
+  </div>
+  <script src="main.js"></script>
 </body>
 </html>
